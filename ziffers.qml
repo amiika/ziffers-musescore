@@ -299,13 +299,15 @@ MuseScore {
             // REPEATS
 
             if(sType=="BeginBarLine") {
-              if(!firstLine) {
-                zline+="\\\n"
-              } else {
-                firstLine = false
+              if(includeBars.checked) {
+                if(!firstLine) {
+                  zline+="\\\n"
+                } else {
+                  firstLine = false
+                }
+                zline += "| "
+                firstInMeasure = true;
               }
-              zline += "| "
-              firstInMeasure = true;
             } else if(sType=="StartRepeatBarLine") {
               zline += "[: "
               startRepeatCount+=1;
@@ -322,9 +324,9 @@ MuseScore {
                   startRepeatCount+=1;
                 }
               } else { // Normal EndBarLine
-                zline += "| "
+                if(includeBars.checked) zline += "| "
               }
-
+              
             }
 
             var el = segment.elementAt((staff*4)+voice);
