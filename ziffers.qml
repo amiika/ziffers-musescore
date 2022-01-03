@@ -7,7 +7,7 @@ import FileIO 3.0
 
 
 MuseScore {
-  version: "0.1"
+  version: "0.2"
   description: qsTr("Export ziffers")
   menuPath: "Plugins.Ziffers"
   pluginType: "dialog"
@@ -133,10 +133,10 @@ MuseScore {
     x :itemX2
     y :itemY1+itemDY*5
     CheckBox {
-          id: includeBars
-          checked: true
-          text: qsTr("Include bars")
-      }
+      id: includeBars
+      checked: true
+      text: qsTr("Include bars")
+    }
   }
 
   RowLayout {  // Quit / Run
@@ -189,216 +189,247 @@ MuseScore {
     return result;
   }
 
+  property var sharps: ["0", "#0", "1", "#1", "2", "3", "#3", "4", "#4", "5", "#5", "6"];
+
+  property var flats: ["0", "b1", "1", "b2", "2", "3", "b4", "4", "b5", "5", "b6", "6"];
+
+  //  KeySig   -7  -6  -5  -4  -3  -2  -1   0   1   2   3   4   5   6   7
+  property var roots: [71, 66, 61, 68, 63, 70, 65, 60, 67, 62, 69, 64, 71, 66, 61];
+
+  property var lengths: Object.freeze({
+    3840: "d",
+    2880: "w.",
+    2560: 'c',
+    1920: "w",
+    1680: "h..",
+    1440: "h.",
+    1280: "y",
+    960: "h",
+    840: "q..",
+    720: "q.",
+    640: "n",
+    480: "q",
+    420: "e..",
+    360: "e.",
+    320: "a",
+    240: "e",
+    210: "s..",
+    180: "s.",
+    160: "f",
+    120: "s",
+    105: "t..",
+    90: "t.",
+    80: "x",
+    60: "t",
+    45: "u.",
+    40: "g",
+    30: "u",
+  });
+
+  property var segmentTypes: Object.freeze({
+    0: "Invalid",
+    1: "BeginBarLine",
+    2: "HeaderClef",
+    4: "KeySig",
+    8: "Ambitus",
+    16: "TimeSig",
+    32: "StartRepeatBarLine",
+    64: "Clef",
+    128: "BarLine",
+    256: "Breath",
+    512: "ChordRest",
+    1024: "EndBarLine",
+    2048: "KeySigAnnounce",
+    4096: "TimeSigAnnounce"
+  });
+
+
+  function getSegmentType(s) {
+    return segmentTypes[Number(s.segmentType)]
+  }
+
   function writeZiffers() {
-    curScore.createPlayEvents();
-    var sharps = ["0", "#0", "1", "#1", "2", "3", "#3", "4", "#4", "5", "#5", "6"];
-    var flats = ["0", "b1", "1", "b2", "2", "3", "b4", "4", "b5", "5", "b6", "6"];
-    //  KeySig   -7  -6  -5  -4  -3  -2  -1   0   1   2   3   4   5   6   7
-    var roots = [71, 66, 61, 68, 63, 70, 65, 60, 67, 62, 69, 64, 71, 66, 61];
-    var lengths = {
-      3840: "d",
-      2880: "w.",
-      2560: 'c',
-      1920: "w",
-      1680: "h..",
-      1440: "h.",
-      1280: "y",
-      960: "h",
-      840: "q..",
-      720: "q.",
-      640: "n",
-      480: "q",
-      420: "e..",
-      360: "e.",
-      320: "a",
-      240: "e",
-      210: "s..",
-      180: "s.",
-      160: "f",
-      120: "s",
-      105: "t..",
-      90: "t.",
-      80: "x",
-      60: "t",
-      45: "u.",
-      40: "g",
-      30: "u",
-    };
-
-    var lines = [];
-    var currentMeasure = null;
-    var measureIndex = 0;
-    var firstInBar = false;
-
-    var startStaff = 0;
-    var endStaff = curScore.nstaves - 1;
+    var lines = []
 
     var octaveShift = 12*octaveShiftInput.value;
 
-    var segment = curScore.firstSegment();
-
-    var mtext = ""
-    for (var staff = startStaff; staff <= endStaff; staff++) {
-
-      var lastOctave = 0;
-      var lastLength = "";
-
+    for (var staff = 0; staff<=curScore.nstaves-1; staff++) {
       for (var voice = 0; voice < 4; voice++) {
-        //console.log("Track: ",staff+1,"Staff: ",(staff+1)*4,"Voice: ", voice+1);
 
-        var duplicateBar = false;
+        console.log("Staff: ", staff, " Track: ", (staff*4)+voice, " Voice: ", voice);
+
+        var measure = curScore.firstMeasure;
+        var measureCounter = 1;
+        var firstInMeasure = true;
+        var zline = "";
+        var lastOctave = 0;
+        var lastLength = "";
         var startRepeatCount = 0;
         var endRepeatCount = 0;
+        var elementsInVoice = false;
+        var firstLine = true;
 
         var cursor = curScore.newCursor();
-        cursor.rewind(Cursor.SCORE_START); // beginning of the score
-        cursor.voice = voice; //voice has to be set after goTo
+        cursor.rewind(Cursor.SCORE_START);
+        cursor.voice = voice;
         cursor.staffIdx = staff;
 
-        if(!currentMeasure) {
-          currentMeasure = cursor.measure
-        }
+        while (measure) {
 
-        while(segment && cursor.segment) {
+          var segment = measure.firstSegment;
 
-          var e = segment.elementAt((staff*4)+voice);
+          while (segment) {
 
-          if (e) {
+            /* Increment cursor to segment position */
+            while(cursor.segment && segment.tick>cursor.tick) {
+              cursor.next();
+            }
 
-            // console.log("E-name: ",e._name(), "E-type: ", e.type);
+            var sType = getSegmentType(segment);
+            console.log("S: ",sType);
 
-            /* Note durations */
-            if (e.type == Element.REST || e.type == Element.CHORD) {
-              var currentLength = lengths[e.duration.ticks]
+            // TODO: ANNOTATIONS & TEMPO's?
 
-              if (lastLength != currentLength || (includeBars.checked && firstInBar)) {
-                if(durationList.key == 0) mtext += currentLength + " ";
-                if(durationList.key == 2) mtext += parseFloat((e.duration.ticks / 1920).toFixed(4)) + " ";
-                lastLength = currentLength;
-                firstInBar = false;
+            if (segment.annotations && segment.annotations.length) {
+              for (var a in segment.annotations) {
+                console.log("Annotation:", segment.annotations[a].type + ": " + segment.annotations[a].name);
               }
             }
 
+            // REPEATS
 
-          if (e.type == Element.BAR_LINE) {
+            if(sType=="BeginBarLine") {
+              if(!firstLine) {
+                zline+="\\\n"
+              } else {
+                firstLine = false
+              }
+              zline += "| "
+              firstInMeasure = true;
+            } else if(sType=="StartRepeatBarLine") {
+              zline += "[: "
+              startRepeatCount+=1;
+            } else if(sType=="EndBarLine") {
 
-
-
-                            switch(e.subtypeName()) {
-                                  case "start-repeat":
-                                        if(duplicateBar) mtext = mtext.substring(0,mtext.length-2); // Remove repeated bar lines
-                                        mtext += "[: "
-                                        startRepeatCount+=1;
-                                        break;
-                                  case "end-repeat":
-                                         mtext += ":] "
-                                         endRepeatCount+=1;
-                                         if(endRepeatCount>startRepeatCount) {
-                                           /* Interpret missing start repeats */
-                                           mtext = "[: "+mtext;
-                                           startRepeatCount+=1;
-                                         }
-
-                                        break;
-                                  case "end-start-repeat":
-                                        mtext += ":][: "
-                                        startRepeatCount+=1;
-                                        endRepeatCount+=1;
-                                        break
-                                  case "normal":
-                                        if(duplicateBar) mtext+="\\\n"
-                                        mtext += "| "
-                                        firstInBar = true;
-                                        duplicateBar = true;
-                                        break;
-                            }
-
-                      } else {
-                        duplicateBar = false;
-                      }
-
-
-
-            if (e.type == Element.REST) {
-              if(durationList.key == 1) mtext += currentLength;
-              mtext += "r ";
-            }
-
-            if (e.type == Element.CHORD) {
-
-              /* Get notes & key signature from cursor */
-              var notes = cursor.element ? cursor.element.notes : null;
-
-              if (notes) {
-                for (var k = 0; k < notes.length; k++) {
-                  var note = notes[k];
-
-                  var rootNote = roots[cursor.keySignature+7]+octaveShift;
-                  var pitchShift = rootNote - 60;
-                  var octave = parseInt((note.pitch - pitchShift) / 12) - 5;
-                  var pc = parseInt(note.pitch - pitchShift) % 12;
-                  var npc = "";
-
-                  var octaveChars = ""
-
-                  if (lastOctave != octave) {
-                    if (octaveList.key==0) {
-                      var octaveChars = ""
-                      octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
-                      mtext += octaveChars + " ";
-                    } else if(octaveList.key==2) {
-                      mtext += "<" + octave + "> ";
-                    }
-                    lastOctave = octave;
-                  }
-
-                  if (notes.tpc >= 6 && notes.tpc <= 12 && flats[pc].length == 2) {
-                    npc = flats[pc];
-                  } else if (notes.tpc >= 20 && notes.tpc <= 26 && flats[pc].length == 2) {
-                    npc = sharps[pc];
-                  } else {
-                    npc = sharps[pc];
-                  }
-
-                  // console.log("Pc: ",pc,"Npc: ",npc,"Root: ", rootNote);
-
-                  // Repeated octaves
-                  if(octaveList.key == 1 && octave!=0) mtext += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
-
-                  // Repeated durations
-                  if(durationList.key == 1) mtext += currentLength;
-
-                  mtext += (scaleList.key==0 ? npc : pc.toString().replace('10','T').replace('11','E'))
-
+              // No EndRepeatBarLine type!? Get subtype from first voice.
+              var b = segment.elementAt(0);
+              if(b && b.subtypeName()=="end-repeat") {
+                zline += ":] "
+                endRepeatCount+=1;
+                if(endRepeatCount>startRepeatCount) {
+                  /* Interpret missing start repeats */
+                  zline = "[: "+zline;
+                  startRepeatCount+=1;
                 }
-                mtext+=" "
+              } else { // Normal EndBarLine
+                zline += "| "
               }
+
             }
+
+            var el = segment.elementAt((staff*4)+voice);
+
+            if (el) {
+              elementsInVoice = true;
+              // console.log("Element ", el.type, ": ",el.name);
+
+              // NOTE DURATIONS
+
+              if (el.type == Element.REST || el.type == Element.CHORD) {
+                var currentLength = lengths[el.duration.ticks]
+
+                if (lastLength != currentLength || (includeBars.checked && firstInMeasure)) {
+                  if(durationList.key == 0) zline += currentLength + " ";
+                  if(durationList.key == 2) zline += parseFloat((el.duration.ticks / 1920).toFixed(4)) + " ";
+                  lastLength = currentLength;
+                  firstInMeasure = false;
+                }
+              }
+
+              // NOTES
+
+              if (el.type == Element.CHORD) {
+
+                var notes = cursor.element ? cursor.element.notes : null;
+
+                if (notes) {
+                  for (var k = 0; k < notes.length; k++) {
+                    var note = notes[k];
+
+                    // TODO: TIES?
+
+                    if(note.tieBack || note.tieForward) console.log("Tieback: " + (note.tieBack != null) + " Tieforward: " + (note.tieForward != null))
+
+                    // TODO: NOTE ELEMENTS?
+                    for (var notEl in note.elements) {
+                      var noteElement = note.elements[notEl]
+                      console.log("Note element: "+noteElement.type, ": ",noteElement.name);
+                    }
+
+                    // TODO: Notate key change?
+                    var rootNote = roots[cursor.keySignature+7]+octaveShift;
+                    var pitchShift = rootNote - 60;
+                    var octave = parseInt((note.pitch - pitchShift) / 12) - 5;
+                    var pc = parseInt(note.pitch - pitchShift) % 12;
+                    var npc = "";
+                    var octaveChars = ""
+
+                    // OCTAVES
+
+                    if (lastOctave != octave) {
+                      if (octaveList.key==0) {
+                        var octaveChars = ""
+                        octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
+                        zline += octaveChars + " ";
+                      } else if(octaveList.key==2) {
+                        zline += "<" + octave + "> ";
+                      }
+                      lastOctave = octave;
+                    }
+
+                    if (notes.tpc >= 6 && notes.tpc <= 12 && flats[pc].length == 2) {
+                      npc = flats[pc];
+                    } else if (notes.tpc >= 20 && notes.tpc <= 26 && flats[pc].length == 2) {
+                      npc = sharps[pc];
+                    } else {
+                      npc = sharps[pc];
+                    }
+
+                    console.log("PC: ",pc," NPC: ",npc," ROOT: ", rootNote);
+
+                    // Repeated octaves
+                    if(octaveList.key == 1 && octave!=0) zline += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
+
+                    // Repeated durations
+                    if(durationList.key == 1) zline += currentLength;
+
+                    zline += (scaleList.key==0 ? npc : pc.toString().replace('10','T').replace('11','E'))
+
+                  }
+                  zline+=" "
+                }
+
+              } else if (el.type == Element.REST) {
+                if(durationList.key == 1) zline += currentLength;
+                zline += "r ";
+              }
+
+            }
+
+            segment = segment.nextInMeasure;
+
           }
 
-          segment = segment.next;
-
-          /* Increment cursor to segment position */
-          while(cursor.segment && segment.tick>cursor.tick) {
-            cursor.next();
-          }
-
-          cursor.voice = voice;
-          cursor.staffIdx = staff;
-          // console.log("Moved cursor to: ", segment.tick,"=",cursor.tick);
-
+          measure = measure.nextMeasure;
+          measureCounter++;
         }
-
-        // Move to beginning of staff
-        segment = curScore.firstSegment();
 
         // Push parsed voices to lines
-        if(mtext.length>0) {
-          lines.push(mtext);
-          mtext = "";
+        if(elementsInVoice && zline.length>0) {
+          lines.push(zline);
         }
+
       }
-      // End of staff
     }
 
     resultDialog.openResultDialog(lines.join("\n\n"));
@@ -408,4 +439,5 @@ MuseScore {
     if (typeof curScore === 'undefined')
     Qt.quit();
   }
+
 }
