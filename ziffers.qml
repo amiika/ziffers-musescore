@@ -7,7 +7,7 @@ import FileIO 3.0
 
 
 MuseScore {
-  version: "0.2"
+  version: "0.3"
   description: qsTr("Export ziffers")
   menuPath: "Plugins.Ziffers"
   pluginType: "dialog"
@@ -66,7 +66,7 @@ MuseScore {
       model: ListModel {
         id: octaveList
         property var key
-        ListElement { text: "Additive"; oName: 0 }
+        ListElement { text: "Sequential"; oName: 0 }
         ListElement { text: "Repeated"; oName: 1 }
         ListElement { text: "Numeric"; oName: 2 }
       }
@@ -243,7 +243,6 @@ MuseScore {
     4096: "TimeSigAnnounce"
   });
 
-
   function getSegmentType(s) {
     return segmentTypes[Number(s.segmentType)]
   }
@@ -286,21 +285,21 @@ MuseScore {
             }
 
             var sType = getSegmentType(segment);
-            console.log("S: ",sType);
+            //console.log("S: ",sType);
 
             // TODO: ANNOTATIONS & TEMPO's?
 
             if (segment.annotations && segment.annotations.length) {
               for (var a in segment.annotations) {
-                console.log("Annotation:", segment.annotations[a].type + ": " + segment.annotations[a].name);
+              //  console.log("Annotation:", segment.annotations[a].type + ": " + segment.annotations[a].name);
               }
             }
 
-            // REPEATS
+            // BARS & REPEATS
 
             if(sType=="BeginBarLine") {
               if(includeBars.checked) {
-                if(!firstLine) {
+                if(!firstLine) { // Skips first line
                   zline+="\\\n"
                 } else {
                   firstLine = false
@@ -312,7 +311,7 @@ MuseScore {
               zline += "[: "
               startRepeatCount+=1;
             } else if(sType=="EndBarLine") {
-
+              firstInMeasure = true;
               // No EndRepeatBarLine type!? Get subtype from first voice.
               var b = segment.elementAt(0);
               if(b && b.subtypeName()=="end-repeat") {
@@ -326,26 +325,28 @@ MuseScore {
               } else { // Normal EndBarLine
                 if(includeBars.checked) zline += "| "
               }
-              
+
             }
 
             var el = segment.elementAt((staff*4)+voice);
 
             if (el) {
               elementsInVoice = true;
-              // console.log("Element ", el.type, ": ",el.name);
+              //console.log("Measure: ",measureCounter, " Element: ", el.type, ": ",el.name);
 
               // NOTE DURATIONS
 
               if (el.type == Element.REST || el.type == Element.CHORD) {
+
                 var currentLength = lengths[el.duration.ticks]
 
-                if (lastLength != currentLength || (includeBars.checked && firstInMeasure)) {
+                if (lastLength!=currentLength || (includeBars.checked && firstInMeasure)) {
                   if(durationList.key == 0) zline += currentLength + " ";
                   if(durationList.key == 2) zline += parseFloat((el.duration.ticks / 1920).toFixed(4)) + " ";
                   lastLength = currentLength;
-                  firstInMeasure = false;
+
                 }
+
               }
 
               // NOTES
@@ -358,14 +359,14 @@ MuseScore {
                   for (var k = 0; k < notes.length; k++) {
                     var note = notes[k];
 
-                    // TODO: TIES?
-
-                    if(note.tieBack || note.tieForward) console.log("Tieback: " + (note.tieBack != null) + " Tieforward: " + (note.tieForward != null))
+                    if(note.tieBack || note.tieForward) {
+                    //  console.log("Tieback: " + (note.tieBack != null) + " Tieforward: " + (note.tieForward != null))
+                    }
 
                     // TODO: NOTE ELEMENTS?
                     for (var notEl in note.elements) {
                       var noteElement = note.elements[notEl]
-                      console.log("Note element: "+noteElement.type, ": ",noteElement.name);
+                      //console.log("Note element: "+noteElement.type, ": ",noteElement.name);
                     }
 
                     // TODO: Notate key change?
@@ -378,16 +379,23 @@ MuseScore {
 
                     // OCTAVES
 
-                    if (lastOctave != octave) {
+                    if (lastOctave != octave || (lastOctave == octave && includeBars.checked && firstInMeasure)) {
                       if (octaveList.key==0) {
-                        var octaveChars = ""
-                        octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
-                        zline += octaveChars + " ";
+                        if(octave==0) {
+                          zline += "," + (notes.length>1 ? "" : " ");
+                        }
+                        else {
+                          var octaveChars = "";
+                          octaveChars = repeatStr((octave<0 ? "_" : "^"), Math.abs(octave));
+                          zline += octaveChars + (notes.length>1 ? "" : " ");
+                        }
                       } else if(octaveList.key==2) {
-                        zline += "<" + octave + "> ";
+                        zline += "<" + octave + ">" + (notes.length>1 ? "" : " ");
                       }
                       lastOctave = octave;
                     }
+
+                    firstInMeasure = false; // Used to print note length & octave in the beginning of measure
 
                     if (notes.tpc >= 6 && notes.tpc <= 12 && flats[pc].length == 2) {
                       npc = flats[pc];
@@ -397,7 +405,7 @@ MuseScore {
                       npc = sharps[pc];
                     }
 
-                    console.log("PC: ",pc," NPC: ",npc," ROOT: ", rootNote);
+                  //  console.log("PC: ",pc," NPC: ",npc," ROOT: ", rootNote);
 
                     // Repeated octaves
                     if(octaveList.key == 1 && octave!=0) zline += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
