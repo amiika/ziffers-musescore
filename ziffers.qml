@@ -371,8 +371,6 @@ function writeZiffers() {
 
           if(sType=="BeginBarLine") {
             if(!firstLine) { // Skips first line
-              // measureString+="\\\n"
-
               if(rowMeasures.length>0) {
                 if(outputType.key == 0) rowMeasures = rowMeasures.join(" | ");
                 if(outputType.key == 1) rowMeasures = rowMeasures.join(" ");
@@ -394,13 +392,7 @@ function writeZiffers() {
             if(b && b.subtypeName()=="end-repeat") {
               measureString += ":] "
               endRepeatCount+=1;
-              if(endRepeatCount>startRepeatCount) {
-                /* Interpret missing start repeats */
-                measureString = "[: "+measureString;
-                startRepeatCount+=1;
-              }
             } else { // Normal EndBarLine
-
             }
 
           }
@@ -429,7 +421,6 @@ function writeZiffers() {
             // NOTES
 
             if (el.type == Element.CHORD) {
-
               var notes = cursor.element ? cursor.element.notes : null;
 
               if (notes) {
@@ -517,16 +508,28 @@ function writeZiffers() {
 
       }
 
+      if(rowMeasures.length>0) { // Push last row
+        if(outputType.key == 0) rowMeasures = rowMeasures.join(" | ")+" |";
+        if(outputType.key == 1) rowMeasures = rowMeasures.join(" ");
+        voiceRows.push(rowMeasures);
+      }
+
       if(elementsInVoice && voiceRows.length>0) {
-        if(outputType.key == 0) voiceRows = voiceRows.join("| \\\n| ");
+        if(outputType.key == 0) voiceRows = (endRepeatCount===startRepeatCount ? "| " : "") + voiceRows.join("| \\\n| ");
         if(outputType.key == 1) voiceRows = voiceRows.join(" ");
         if(outputType.key == 3) voiceRows = voiceRows.concat.apply([], voiceRows);
+        if(endRepeatCount>startRepeatCount) {
+          if (outputType.key == 0 || outputType.key == 1) {
+            voiceRows = (outputType.key == 0 ? "|" : "")+repeatStr("[:",endRepeatCount-startRepeatCount)+" "+voiceRows
+          } else {
+            voiceRows[0] = repeatStr("[:",endRepeatCount-startRepeatCount)+" "+voiceRows[0]
+          }
+        }
         staffVoices.push(voiceRows);
         voiceRows = [];
       }
     }
     if(outputType.key == 0 || outputType.key == 1) staffVoices = staffVoices.join(" \n\n");
-    if(outputType.key == 0) staffVoices = "| "+staffVoices+" |";
     scoreStaffs.push(staffVoices);
     staffVoices = [];
   }
