@@ -128,6 +128,8 @@ MuseScore {
         ListElement { text: "Without bars"; oName: 1 }
         ListElement { text: "Array with lines"; oName: 2 }
         ListElement { text: "Array without lines"; oName: 3 }
+        ListElement { text: "Horizontal array"; oName: 4 }
+        ListElement { text: "Horizontal text"; oName: 5 }
       }
       width: 100
       onCurrentIndexChanged: {
@@ -241,6 +243,21 @@ property var expand: function expand(str) {
     return a.replace(/\\"/g, '"');
   });
 };
+
+function transpose(matrix) {
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const grid = [];
+  for (var j = 0; j < cols; j++) {
+    grid[j] = Array(rows);
+  }
+  for (var i = 0; i < rows; i++) {
+    for (var j = 0; j < cols; j++) {
+      grid[j][i] = matrix[i][j];
+    }
+  }
+  return grid;
+}
 
 property var stringify: function stringify(obj) {
   return expand(JSON.stringify(obj, replacer, 2));
@@ -447,18 +464,13 @@ function writeZiffers() {
 
                   // OCTAVES
 
-                  if (octaveList.key!=3 && (lastOctave != octave || (lastOctave == octave && octave!==0 && outputType.key!=1 && firstInMeasure))) {
+                  if (octaveList.key!=3 && (lastOctave != octave)) {
                     if (octaveList.key==0) {
-                      if(octave == 0) {
-                        measureString += "," + (notes.length>1 ? "" : " ");
-                      }
-                      else {
                         var octaveChars = "";
-                        octaveChars = repeatStr((octave<0 ? "_" : "^"), Math.abs(octave));
+                        octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
                         measureString += octaveChars + (notes.length>1 ? "" : " ");
-                      }
                     } else if(octaveList.key==2) {
-                      measureString += "<" + octave + ">" + (notes.length>1 ? "" : " ");
+                      measureString += "(" + octave + ")" + (notes.length>1 ? "" : " ");
                     }
                     lastOctave = octave;
                   }
@@ -517,7 +529,7 @@ function writeZiffers() {
       if(elementsInVoice && voiceRows.length>0) {
         if(outputType.key == 0) voiceRows = (endRepeatCount===startRepeatCount ? "| " : "") + voiceRows.join("| \\\n| ");
         if(outputType.key == 1) voiceRows = voiceRows.join(" ");
-        if(outputType.key == 3) voiceRows = voiceRows.concat.apply([], voiceRows);
+        if(outputType.key == 3 || outputType.key == 4 || outputType.key == 5) voiceRows = voiceRows.concat.apply([], voiceRows);
         if(endRepeatCount>startRepeatCount) {
           if (outputType.key == 0 || outputType.key == 1) {
             voiceRows = (outputType.key == 0 ? "|" : "")+repeatStr("[:",endRepeatCount-startRepeatCount)+" "+voiceRows
@@ -536,10 +548,22 @@ function writeZiffers() {
 
   var resultString = "No output!"
 
+  if(outputType.key == 4 || outputType.key == 5)  {
+    scoreStaffs = scoreStaffs.concat.apply([], scoreStaffs)
+    scoreStaffs = transpose(scoreStaffs)
+  }
+
   if(outputType.key == 0 || outputType.key == 1) {
     resultString =scoreStaffs.join("\n\n");
+  } else if(outputType.key == 5) {
+    scoreStaffs = scoreStaffs.map(function(e){
+      return e.join(" | ");
+    });
+    resultString = scoreStaffs.join("\n");
   } else {
+
     resultString = stringify(scoreStaffs);
+
   }
   resultDialog.openResultDialog(resultString);
 }
