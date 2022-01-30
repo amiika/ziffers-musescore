@@ -6,7 +6,7 @@ import MuseScore 3.0
 import FileIO 3.0
 
 MuseScore {
-  version: "0.3"
+  version: "0.4"
   description: qsTr("Export ziffers")
   menuPath: "Plugins.Ziffers"
   pluginType: "dialog"
@@ -66,7 +66,7 @@ MuseScore {
       model: ListModel {
         id: octaveList
         property var key
-        ListElement { text: "Sequential"; oName: 0 }
+        ListElement { text: "Additive"; oName: 0 }
         ListElement { text: "Repeated"; oName: 1 }
         ListElement { text: "Numeric"; oName: 2 }
         ListElement { text: "No octaves"; oName: 3 }
@@ -98,6 +98,7 @@ MuseScore {
         property var key
         ListElement { text: "Major/Minor"; sName: 0 }
         ListElement { text: "Chromatic"; sName: 1 }
+        ListElement { text: "Midi"; sName: 3 }
       }
       width: 100
       onCurrentIndexChanged: {
@@ -128,8 +129,8 @@ MuseScore {
         ListElement { text: "Without bars"; oName: 1 }
         ListElement { text: "Array with lines"; oName: 2 }
         ListElement { text: "Array without lines"; oName: 3 }
-        ListElement { text: "Horizontal array"; oName: 4 }
-        ListElement { text: "Horizontal text"; oName: 5 }
+        ListElement { text: "Tracker array"; oName: 4 }
+        ListElement { text: "Tracker text"; oName: 5 }
       }
       width: 100
       onCurrentIndexChanged: {
@@ -161,18 +162,17 @@ MuseScore {
     }
   }
 
-  /*
-  RowLayout { // Use bars
-  id: rowIncludeBars
+  RowLayout { // Use repeats
+  id: rowIncludeRepeats
   x :itemX2
-  y :itemY1+itemDY*5
+  y :itemY1+itemDY*6
   CheckBox {
-  id: includeBars
+  id: includeRepeats
   checked: true
-  text: qsTr("Include bars")
+  text: qsTr("Include repeats")
 }
 }
-*/
+
 
 RowLayout {  // Quit / Run
   id: rowCancelOk
@@ -400,14 +400,14 @@ function writeZiffers() {
             }
             firstInMeasure = true;
           } else if(sType=="StartRepeatBarLine") {
-            measureString += "[: "
+            if(includeRepeats.checked && !(outputType.key == 4 || outputType.key == 5)) measureString += "[: "
             startRepeatCount+=1;
           } else if(sType=="EndBarLine") {
             firstInMeasure = true;
             // No EndRepeatBarLine type!? Get subtype from first voice.
             var b = segment.elementAt(0);
             if(b && b.subtypeName()=="end-repeat") {
-              measureString += ":] "
+              if(includeRepeats.checked  && !(outputType.key == 4 || outputType.key == 5)) measureString += ":] "
               endRepeatCount+=1;
             } else { // Normal EndBarLine
             }
@@ -460,7 +460,7 @@ function writeZiffers() {
                   var octave = parseInt((note.pitch - pitchShift) / 12) - 5;
                   var pc = parseInt(note.pitch - pitchShift) % 12;
                   var npc = "";
-                  var octaveChars = ""
+                  var octaveChars = "";
 
                   // OCTAVES
 
@@ -472,7 +472,7 @@ function writeZiffers() {
                     } else if(octaveList.key==2) {
                       measureString += "(" + octave + ")" + (notes.length>1 ? "" : " ");
                     }
-                    lastOctave = octave;
+                    if(notes.length<2) lastOctave = octave;
                   }
 
                   firstInMeasure = false; // Used to print note length & octave in the beginning of measure
@@ -493,7 +493,7 @@ function writeZiffers() {
                   // Repeated durations
                   if(durationList.key == 1) measureString += currentLength;
 
-                  measureString += (scaleList.key==0 ? npc : pc.toString().replace('10','T').replace('11','E'))
+                  measureString += (scaleList.key==0 ? npc : (scaleList.key==1 ? pc.toString().replace('10','T').replace('11','E') : note.pitch))
 
                 }
                 measureString+=" "
@@ -518,6 +518,11 @@ function writeZiffers() {
         measure = measure.nextMeasure;
         measureCounter++;
 
+        if(!(outputType.key == 1 && octaveList.key == 0)) {
+          // Reset octave unless output is one big measure
+          lastOctave = 0
+        }
+
       }
 
       if(rowMeasures.length>0) { // Push last row
@@ -530,12 +535,14 @@ function writeZiffers() {
         if(outputType.key == 0) voiceRows = (endRepeatCount===startRepeatCount ? "| " : "") + voiceRows.join("| \\\n| ");
         if(outputType.key == 1) voiceRows = voiceRows.join(" ");
         if(outputType.key == 3 || outputType.key == 4 || outputType.key == 5) voiceRows = voiceRows.concat.apply([], voiceRows);
-        if(endRepeatCount>startRepeatCount) {
+        if(includeRepeats.checked  && !(outputType.key == 4 || outputType.key == 5) && endRepeatCount>startRepeatCount) {
           if (outputType.key == 0 || outputType.key == 1) {
             voiceRows = (outputType.key == 0 ? "|" : "")+repeatStr("[:",endRepeatCount-startRepeatCount)+" "+voiceRows
           } else {
             voiceRows[0] = repeatStr("[:",endRepeatCount-startRepeatCount)+" "+voiceRows[0]
           }
+        } else {
+          if(outputType.key == 0) voiceRows = "| "+voiceRows
         }
         staffVoices.push(voiceRows);
         voiceRows = [];
