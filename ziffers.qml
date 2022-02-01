@@ -98,7 +98,6 @@ MuseScore {
         property var key
         ListElement { text: "Major/Minor"; sName: 0 }
         ListElement { text: "Chromatic"; sName: 1 }
-        ListElement { text: "Midi"; sName: 3 }
       }
       width: 100
       onCurrentIndexChanged: {
@@ -131,6 +130,7 @@ MuseScore {
         ListElement { text: "Array without lines"; oName: 3 }
         ListElement { text: "Tracker array"; oName: 4 }
         ListElement { text: "Tracker text"; oName: 5 }
+        ListElement { text: "Midi array"; oName: 6 }
       }
       width: 100
       onCurrentIndexChanged: {
@@ -196,25 +196,27 @@ RowLayout {  // Quit / Run
 
 Dialog {
   id: resultDialog
-  width: 1000
-  height: 500
-  contentItem: RowLayout {
+  width: 1025
+  height: 560
+
+  // Removed contentItem: which should add default "OK" button.
+  GridLayout {
+    id: grid
+    rows: 2
+    width: 1000
+    height: 500
     TextArea {
       anchors.fill: parent
       id: textHolder
       text: ".."
     }
-  }
-  onAccepted: {
-    exportDialog.visible = false
-    Qt.quit()
+
   }
   function openResultDialog(message) {
     textHolder.text = message
     open()
   }
 }
-
 /* Some ES5 helpers */
 
 property var _typeof:  function(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
@@ -349,6 +351,7 @@ function writeZiffers() {
       var voiceRows = [];
       var rowMeasures = [];
       var firstInMeasure = true;
+      var measureArray = [];
       var measureString = "";
       var lastOctave = 0;
       var lastLength = "";
@@ -394,7 +397,6 @@ function writeZiffers() {
                 voiceRows.push(rowMeasures);
                 rowMeasures = [];
               }
-
             } else {
               firstLine = false
             }
@@ -441,6 +443,8 @@ function writeZiffers() {
               var notes = cursor.element ? cursor.element.notes : null;
 
               if (notes) {
+                var chordArray = [];
+
                 for (var k = 0; k < notes.length; k++) {
                   var note = notes[k];
 
@@ -493,14 +497,30 @@ function writeZiffers() {
                   // Repeated durations
                   if(durationList.key == 1) measureString += currentLength;
 
-                  measureString += (scaleList.key==0 ? npc : (scaleList.key==1 ? pc.toString().replace('10','T').replace('11','E') : note.pitch))
+                  var noteArray = [parseFloat((el.duration.ticks / 1920).toFixed(4)),note.pitch];
 
+                  if(notes.length>1) {
+                    chordArray.push(noteArray);
+                  } else {
+                    measureArray.push(noteArray);
+                  }
+
+                  measureString += (scaleList.key==0 ? npc : pc.toString().replace('10','T').replace('11','E'))
+
+                }
+
+                if(notes.length>1) {
+                  measureArray.push(chordArray);
+                  chordArray = [];
                 }
                 measureString+=" "
               }
 
             } else if (el.type == Element.REST) {
               if(durationList.key == 1) measureString += currentLength;
+
+              measureArray.push([parseFloat((el.duration.ticks / 1920).toFixed(4)),"r"]);
+
               measureString += "r ";
             }
 
@@ -511,8 +531,13 @@ function writeZiffers() {
         }
 
         if(measureString.length>0) {
-          rowMeasures.push(measureString);
-          measureString = ""
+          if(outputType.key==6) {
+            rowMeasures.push(measureArray);
+          } else {
+            rowMeasures.push(measureString);
+          }
+          measureString = "";
+          measureArray = [];
         }
 
         measure = measure.nextMeasure;
@@ -532,7 +557,7 @@ function writeZiffers() {
       }
 
       if(elementsInVoice && voiceRows.length>0) {
-        if(outputType.key == 0) voiceRows = (endRepeatCount===startRepeatCount ? "| " : "") + voiceRows.join("| \\\n| ");
+        if(outputType.key == 0) voiceRows = voiceRows.join("| \\\n| ");
         if(outputType.key == 1) voiceRows = voiceRows.join(" ");
         if(outputType.key == 3 || outputType.key == 4 || outputType.key == 5) voiceRows = voiceRows.concat.apply([], voiceRows);
         if(includeRepeats.checked  && !(outputType.key == 4 || outputType.key == 5) && endRepeatCount>startRepeatCount) {
@@ -569,7 +594,7 @@ function writeZiffers() {
     resultString = scoreStaffs.join("\n");
   } else {
 
-    resultString = stringify(scoreStaffs);
+    resultString = outputType.key==6 ? JSON.stringify(scoreStaffs) : stringify(scoreStaffs);
 
   }
   resultDialog.openResultDialog(resultString);
