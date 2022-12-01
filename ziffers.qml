@@ -343,16 +343,20 @@ function writeZiffers() {
   var cursor = curScore.newCursor();
   var endTick = 0;  
   var fullScore = false;
-  
-  cursor.rewind(1); // rewind to start of selection
-  if (!cursor.segment) { // no selection
-    fullScore = true;
-  } else {
+  var startStaff = 0;
+  var endStaff = curScore.nstaves - 1;
+   
+  cursor.rewind(1);  // rewind to start of selection
+   if (!cursor.segment) { // no selection
+     fullScore = true;
+   } else {
+    startStaff = cursor.staffIdx;
     cursor.rewind(2); // rewind to end of selection
     endTick = cursor.tick;
-  }
+    endStaff   = cursor.staffIdx;
+   }
 
-  for (var staff = 0; staff<=curScore.nstaves-1; staff++) {
+  for (var staff = startStaff; staff<=endStaff; staff++) {
     var staffVoices = [];
     for (var voice = 0; voice < 4; voice++) {
 
@@ -443,10 +447,10 @@ function writeZiffers() {
             if (el.type == Element.REST || el.type == Element.CHORD) {
 
               var currentLength = lengths[el.duration.ticks]
-
+			
               if (durationList.key!=3 && (lastLength!=currentLength || (outputType.key!=1 && firstInMeasure))) {
-                if(durationList.key == 0) measureString += currentLength + " ";
-                if(durationList.key == 2) measureString += parseFloat((el.duration.ticks / 1920).toFixed(4)) + " ";
+                if(durationList.key == 0 && currentLength!=undefined) measureString += currentLength + " ";
+                if(durationList.key == 2 || currentLength==undefined) measureString += parseFloat((el.duration.ticks / 1920).toFixed(4)) + " ";
                 lastLength = currentLength;
 
               }
