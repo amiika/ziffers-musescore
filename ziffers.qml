@@ -339,6 +339,18 @@ function writeZiffers() {
 
   var octaveShift = 12*octaveShiftInput.value;
   var scoreStaffs = [];
+      
+  var cursor = curScore.newCursor();
+  var endTick = 0;  
+  var fullScore = false;
+  
+  cursor.rewind(1); // rewind to start of selection
+  if (!cursor.segment) { // no selection
+    fullScore = true;
+  } else {
+    cursor.rewind(2); // rewind to end of selection
+    endTick = cursor.tick;
+  }
 
   for (var staff = 0; staff<=curScore.nstaves-1; staff++) {
     var staffVoices = [];
@@ -346,7 +358,6 @@ function writeZiffers() {
 
       console.log("Staff: ", staff, " Track: ", (staff*4)+voice, " Voice: ", voice);
 
-      var measure = curScore.firstMeasure;
       var measureCounter = 1;
       var voiceRows = [];
       var rowMeasures = [];
@@ -360,12 +371,17 @@ function writeZiffers() {
       var elementsInVoice = false;
       var firstLine = true;
 
-      var cursor = curScore.newCursor();
-      cursor.rewind(Cursor.SCORE_START);
+      if(fullScore) {
+        cursor.rewind(Cursor.SCORE_START);
+      } else {
+        cursor.rewind(1);
+      }
       cursor.voice = voice;
       cursor.staffIdx = staff;
 
-      while (measure) {
+      var measure = fullScore ? curScore.firstMeasure : cursor.measure
+      
+      while ((measure && fullScore) || (measure && cursor.tick<endTick)) {
 
         var segment = measure.firstSegment;
 
@@ -469,12 +485,12 @@ function writeZiffers() {
                   // OCTAVES
 
                   if (octaveList.key!=3 && (lastOctave != octave)) {
-                    if (octaveList.key==0) {
+                    if (octaveList.key==0) { // Octave symbol
                         var octaveChars = "";
                         octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
                         measureString += octaveChars + (notes.length>1 ? "" : " ");
-                    } else if(octaveList.key==2) {
-                      measureString += "(" + octave + ")" + (notes.length>1 ? "" : " ");
+                    } else if(octaveList.key==2) { // Octave number
+                      measureString += "<" + octave + ">" + (notes.length>1 ? "" : " ");
                     }
                     if(notes.length<2) lastOctave = octave;
                   }
