@@ -340,21 +340,22 @@ function writeZiffers() {
   var octaveShift = 12*octaveShiftInput.value;
   var scoreStaffs = [];
       
-  var cursor = curScore.newCursor();
+  
   var endTick = 0;  
   var fullScore = false;
   var startStaff = 0;
   var endStaff = curScore.nstaves - 1;
    
-  cursor.rewind(1);  // rewind to start of selection
-   if (!cursor.segment) { // no selection
-     fullScore = true;
-   } else {
-    startStaff = cursor.staffIdx;
-    cursor.rewind(2); // rewind to end of selection
-    endTick = cursor.tick;
-    endStaff   = cursor.staffIdx;
-   }
+  var cursor = curScore.newCursor();
+  cursor.rewind(Cursor.SELECTION_START);  // rewind to start of selection
+  if (!cursor.segment) { // no selection
+    fullScore = true;
+  } else {
+   startStaff = cursor.staffIdx;
+   cursor.rewind(Cursor.SELECTION_END); // rewind to end of selection
+   endTick = cursor.tick;
+   endStaff = cursor.staffIdx;
+  }
 
   for (var staff = startStaff; staff<=endStaff; staff++) {
     var staffVoices = [];
@@ -374,11 +375,12 @@ function writeZiffers() {
       var endRepeatCount = 0;
       var elementsInVoice = false;
       var firstLine = true;
-
+	  
+	  var cursor = curScore.newCursor();
       if(fullScore) {
         cursor.rewind(Cursor.SCORE_START);
       } else {
-        cursor.rewind(1);
+        cursor.rewind(Cursor.SELECTION_START);
       }
       cursor.voice = voice;
       cursor.staffIdx = staff;
