@@ -12,7 +12,7 @@ MuseScore {
   pluginType: "dialog"
   id: window
   width:285
-  height:285
+  height:280
   property var itemX1 : 10
   property var itemX2 : 150
   property var itemY1 : 10
@@ -198,15 +198,15 @@ Dialog {
   title: "Parsed notation"
   id: resultDialog
   width: 1025
-  height: 560
+  height: 300
 
   // Removed contentItem: which should add default "OK" button.
   GridLayout {
     id: grid
-    rows: 2
-    width: 1000
-    height: 500
+    implicitHeight: 20
+    anchors.fill: parent
     TextArea {
+	  implicitHeight: 20
       anchors.fill: parent
       id: textHolder
       text: ".."
