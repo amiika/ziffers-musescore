@@ -195,6 +195,7 @@ RowLayout {  // Quit / Run
 }
 
 Dialog {
+  title: "Parsed notation"
   id: resultDialog
   width: 1025
   height: 560
