@@ -96,7 +96,7 @@ MuseScore {
       model: ListModel {
         id: scaleList
         property var key
-        ListElement { text: "Major/Minor"; sName: 0 }
+        ListElement { text: "Diatonic"; sName: 0 }
         ListElement { text: "Chromatic"; sName: 1 }
       }
       width: 100
@@ -371,11 +371,15 @@ function writeZiffers() {
       var measureArray = [];
       var measureString = "";
       var lastOctave = 0;
+	  var currentLength = "";
       var lastLength = "";
+	  var lastTicks = 0;
       var startRepeatCount = 0;
       var endRepeatCount = 0;
       var elementsInVoice = false;
       var firstLine = true;
+	  var tieForward = false;
+	  var tieBack = false;
 	  
 	  var cursor = curScore.newCursor();
       if(fullScore) {
@@ -445,21 +449,6 @@ function writeZiffers() {
             elementsInVoice = true;
             //console.log("Measure: ",measureCounter, " Element: ", el.type, ": ",el.name);
 
-            // NOTE DURATIONS
-
-            if (el.type == Element.REST || el.type == Element.CHORD) {
-
-              var currentLength = lengths[el.duration.ticks]
-			
-              if (durationList.key!=3 && (lastLength!=currentLength || (outputType.key!=1 && firstInMeasure))) {
-                if(durationList.key == 0 && currentLength!=undefined) measureString += currentLength + " ";
-                if(durationList.key == 2 || currentLength==undefined) measureString += parseFloat((el.duration.ticks / 1920).toFixed(4)) + " ";
-                lastLength = currentLength;
-
-              }
-
-            }
-
             // NOTES
 
             if (el.type == Element.CHORD) {
@@ -467,13 +456,18 @@ function writeZiffers() {
 
               if (notes) {
                 var chordArray = [];
-
+				tieForward = false;
+				
                 for (var k = 0; k < notes.length; k++) {
                   var note = notes[k];
 
-                  if(note.tieBack || note.tieForward) {
-                    //  console.log("Tieback: " + (note.tieBack != null) + " Tieforward: " + (note.tieForward != null))
+                  if(note.tieForward) {
+					tieForward = true
                   }
+				  
+				  if(note.tieBack) {
+					tieBack = true
+				  }
 
                   // TODO: NOTE ELEMENTS?
                   for (var notEl in note.elements) {
@@ -489,9 +483,25 @@ function writeZiffers() {
                   var npc = "";
                   var octaveChars = "";
 
+				  var currentTicks = el.duration.ticks;
+				  currentLength = lengths[currentTicks];
+				  currentLength = (tieBack ? lastLength+currentLength : currentLength)
+				  
+				  // NOTE LENGTHS
+				  if (!tieForward) {
+					if (durationList.key!=3 && (lastLength!=currentLength || (outputType.key!=1 && firstInMeasure) || tieBack)) {
+						if(durationList.key == 0 && currentLength!=undefined) measureString += currentLength + " ";
+						if(durationList.key == 2 || currentLength==undefined) measureString += parseFloat((tieBack ? ((lastTicks / 1920)+(currentTicks / 1920)) : (currentTicks / 1920)).toFixed(4)) + " ";
+					}
+				  }
+				  	  
+                  // Repeated durations
+                  if(!tieForward && durationList.key == 1) measureString += currentLength;
+			
+
                   // OCTAVES
 
-                  if (octaveList.key!=3 && (lastOctave != octave)) {
+                  if (!tieForward && octaveList.key!=3 && (lastOctave != octave)) {
                     if (octaveList.key==0) { // Octave symbol
                         var octaveChars = "";
                         octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
@@ -501,8 +511,6 @@ function writeZiffers() {
                     }
                     if(notes.length<2) lastOctave = octave;
                   }
-
-                  firstInMeasure = false; // Used to print note length & octave in the beginning of measure
 
                   if (notes.tpc >= 6 && notes.tpc <= 12 && flats[pc].length == 2) {
                     npc = flats[pc];
@@ -515,11 +523,8 @@ function writeZiffers() {
                   //  console.log("PC: ",pc," NPC: ",npc," ROOT: ", rootNote);
 
                   // Repeated octaves
-                  if(octaveList.key == 1 && octave!=0) measureString += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
-
-                  // Repeated durations
-                  if(durationList.key == 1) measureString += currentLength;
-
+                  if(!tieForward && octaveList.key == 1 && octave!=0) measureString += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
+				  
                   var noteArray = [parseFloat((el.duration.ticks / 1920).toFixed(4)),note.pitch];
 
                   if(notes.length>1) {
@@ -528,8 +533,8 @@ function writeZiffers() {
                     measureArray.push(noteArray);
                   }
 
-                  measureString += (scaleList.key==0 ? npc : pc.toString().replace('10','T').replace('11','E'))
-
+                  if(!tieForward) measureString += (scaleList.key==0 ? npc : pc.toString().replace('10','T').replace('11','E'))
+				  
                 }
 
                 if(notes.length>1) {
@@ -540,14 +545,32 @@ function writeZiffers() {
               }
 
             } else if (el.type == Element.REST) {
-              if(durationList.key == 1) measureString += currentLength;
+			
+			// REST NOTE DURATIONS
 
+			  currentLength = lengths[el.duration.ticks];
+              if (durationList.key!=3 && (lastLength!=currentLength || (outputType.key!=1 && firstInMeasure))) {
+                if(durationList.key == 0 && currentLength!=undefined) measureString += currentLength + " ";
+                if(durationList.key == 2 || currentLength==undefined) measureString += parseFloat((el.duration.ticks / 1920).toFixed(4)) + " ";
+              }
+			  
+              if(durationList.key == 1) measureString += currentLength;
+			
               measureArray.push([parseFloat((el.duration.ticks / 1920).toFixed(4)),"r"]);
 
               measureString += "r ";
             }
+			
+			if (el.type == Element.REST || el.type == Element.CHORD) firstInMeasure = false; // Used to print note length & octave in the beginning of measure
+
+			
+			
 
           }
+		  
+		  lastLength = currentLength;
+		  lastTicks = currentTicks;
+		  tieBack = false;
 
           segment = segment.nextInMeasure;
 
@@ -568,7 +591,7 @@ function writeZiffers() {
 
         if(!(outputType.key == 1 && octaveList.key == 0)) {
           // Reset octave unless output is one big measure
-          lastOctave = 0
+          lastOctave = 0;
         }
 
       }
