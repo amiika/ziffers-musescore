@@ -206,6 +206,8 @@ Dialog {
     implicitHeight: 20
     anchors.fill: parent
     TextArea {
+	  font.pixelSize: 11
+      font.family: "Inconsolata"
 	  implicitHeight: 20
       anchors.fill: parent
       id: textHolder
