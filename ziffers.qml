@@ -314,6 +314,8 @@ property var lengths: Object.freeze({
   45: "u.",
   40: "g",
   30: "u",
+  15: "j",
+  8: "o"
 });
 
 property var segmentTypes: Object.freeze({
