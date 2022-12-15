@@ -491,30 +491,37 @@ function writeZiffers() {
 				  currentLength = lengths[currentTicks];
 				  currentLength = (tieBack ? lastLength+currentLength : currentLength)
 				  
-				  // NOTE LENGTHS
-				  if (!tieForward) {
-					if (durationList.key!=3 && (lastLength!=currentLength || (outputType.key!=1 && firstInMeasure) || tieBack)) {
-						if(durationList.key == 0 && currentLength!=undefined) measureString += currentLength + " ";
-						if(durationList.key == 2 || currentLength==undefined) measureString += parseFloat((tieBack ? ((lastTicks / 1920)+(currentTicks / 1920)) : (currentTicks / 1920)).toFixed(4)) + " ";
-					}
+				  if(k==0) { // Only for first occurance for chords
+				  
+					  // NOTE LENGTHS
+					  if (!tieForward) {
+						if (durationList.key!=3 && (lastLength!=currentLength || (outputType.key!=1 && firstInMeasure) || tieBack)) {
+							if(durationList.key == 0 && currentLength!=undefined) measureString += currentLength + " ";
+							if(durationList.key == 2 || currentLength==undefined) measureString += parseFloat((tieBack ? ((lastTicks / 1920)+(currentTicks / 1920)) : (currentTicks / 1920)).toFixed(4)) + " ";
+						}
+					  }
+						  
+					  // Repeated durations
+					  if(!tieForward && durationList.key == 1) measureString += currentLength;
+				
+
+					  // OCTAVES
+
+					  if (!tieForward && octaveList.key!=3 && (lastOctave != octave)) {
+						if (octaveList.key==0) { // Octave symbol
+							var octaveChars = "";
+							octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
+							measureString += octaveChars + (notes.length>1 ? "" : " ");
+						} else if(octaveList.key==2) { // Octave number
+						  measureString += "<" + octave + ">" + (notes.length>1 ? "" : " ");
+						}
+						if(notes.length<2) lastOctave = octave;
+					  }
+					  
+					   // Repeated octaves
+					  if(!tieForward && octaveList.key == 1 && octave!=0) measureString += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
+				  			  
 				  }
-				  	  
-                  // Repeated durations
-                  if(!tieForward && durationList.key == 1) measureString += currentLength;
-			
-
-                  // OCTAVES
-
-                  if (!tieForward && octaveList.key!=3 && (lastOctave != octave)) {
-                    if (octaveList.key==0) { // Octave symbol
-                        var octaveChars = "";
-                        octaveChars = repeatStr((octave < lastOctave ? "_" : "^"), Math.abs(lastOctave - octave));
-                        measureString += octaveChars + (notes.length>1 ? "" : " ");
-                    } else if(octaveList.key==2) { // Octave number
-                      measureString += "<" + octave + ">" + (notes.length>1 ? "" : " ");
-                    }
-                    if(notes.length<2) lastOctave = octave;
-                  }
 
                   if (notes.tpc >= 6 && notes.tpc <= 12 && flats[pc].length == 2) {
                     npc = flats[pc];
@@ -526,9 +533,6 @@ function writeZiffers() {
 
                   //  console.log("PC: ",pc," NPC: ",npc," ROOT: ", rootNote);
 
-                  // Repeated octaves
-                  if(!tieForward && octaveList.key == 1 && octave!=0) measureString += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
-				  
                   var noteArray = [parseFloat((el.duration.ticks / 1920).toFixed(4)),note.pitch];
 
                   if(notes.length>1) {
