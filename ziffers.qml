@@ -587,9 +587,9 @@ MuseScore {
                                         if (!tieForward && octaveList.key == 1 && octave != 0)
                                             measureString += repeatStr((octave < 0 ? "_" : "^"), Math.abs(octave));
 
-                                        if (notes.tpc >= 6 && notes.tpc <= 12 && flats[pc].length == 2) {
+                                        if (note.tpc >= 6 && note.tpc <= 12) {
                                             npc = flats[pc];
-                                        } else if (notes.tpc >= 20 && notes.tpc <= 26 && flats[pc].length == 2) {
+                                        } else if (note.tpc >= 20 && note.tpc <= 26) {
                                             npc = sharps[pc];
                                         } else {
                                             npc = sharps[pc];
